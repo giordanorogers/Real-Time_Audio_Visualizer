@@ -1,0 +1,76 @@
+import pyaudio
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Constants
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+CHUNK = 8192
+THRESHOLD = 1000
+
+# Desired Y-axis limits for amplitude visualization
+Y_MIN = -1000
+Y_MAX = 1000
+
+# Initialize PyAudio
+p = pyaudio.PyAudio()
+
+# Create a Matplotlib figure for real-time visualization
+plt.ion()
+fig, ax = plt.subplots()
+
+# Create a gradient colormap for amplitude visualization
+def gradient(value):
+    # Map value to 0-1 range
+    value = (value) / (Y_MAX - Y_MIN)
+    
+    # Use 'rainbow' colormap to map the value
+    return plt.cm.rainbow(value)
+
+# Main loop for real-time audio visualization
+try:
+    # Open the audio stream
+    stream = p.open(format=FORMAT,
+                    channels=CHANNELS,
+                    rate=RATE,
+                    input=True,
+                    frames_per_buffer=CHUNK)
+    print("Stream opened.")
+
+    while True:
+        # Read audio data from the stream
+        data = stream.read(CHUNK)
+        audio_array = np.frombuffer(data, dtype=np.int16)
+
+        # Check the maximum amplitude in the current chunk
+        max_amplitude = np.max(np.abs(audio_array))
+
+        # Calculate a scaling factor based on the maximum amplitude
+        scaling_factor = 1.0 if max_amplitude <= THRESHOLD else THRESHOLD / max_amplitude
+
+        # Scale the audio data within the desired Y-axis limits
+        audio_array_scaled = audio_array * scaling_factor
+
+        ax.clear()
+        ax.plot(audio_array_scaled, color=gradient(max_amplitude))
+        ax.set_title('Real-Time Audio Visualization')
+        ax.set_xlabel('Sample')
+        ax.set_ylabel('Amplitude')
+        ax.set_ylim(Y_MIN, Y_MAX)  # Set Y-axis limits
+        plt.pause(0.01)
+except KeyboardInterrupt:
+    pass
+except Exception as e:
+    print(f"Error: {e}")
+finally:
+    # Close the stream and terminate PyAudio
+    if 'stream' in locals() and stream is not None:
+        stream.stop_stream()
+        stream.close()
+        print("Stream closed.")
+    p.terminate()
+
+# Close the Matplotlib figure
+plt.ioff()
+plt.show()
